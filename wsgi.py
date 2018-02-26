@@ -3,38 +3,36 @@ import re
 from cgi import escape
 from threading import Thread
 import queue
-from clicklist_manager import update_cart
+from clicklist_manager import (update_cart, empty_cart)
 import logging
 from logging.handlers import QueueHandler
 import datetime
+
+## uwsgi --enable-threads --http :8084 --wsgi-file wsgi.py
 
 logging.basicConfig(level=logging.INFO)
 que = queue.Queue(-1)
 log_root = logging.getLogger(None)
 log_root.addHandler(QueueHandler(que)) 
-running = False
+running = None
 
 class ClickListThread(Thread):
-    def __init__(self):
+    def __init__(self, cmd):
         global running
         Thread.__init__(self)
-        running = True
-        #queue_handler = QueueHandler(self.que)
-        #logging.getLogger().addHandler(queue_handler)
+        running = "Running"
+        self.cmd = cmd
 
     def run(self):
         global running
         logging.info("Running ClickList update")
-        update_cart()
-        running = False
+        self.cmd()
+        running = "Stopped"
 
 def index(environ, start_response):
     """This function will be mounted on "/" and display a link
     to the hello world page."""
     print("Sending Index")
-    t = ClickListThread()
-    t.daemon = True
-    t.start()
     start_response('200 OK', [('Content-Type', 'text/html')])
     str = '''
 <!DOCTYPE html>
@@ -53,7 +51,20 @@ def index(environ, start_response):
 </html>'''
     return [str.encode('utf-8')]
 
+def update(environ, start_response):
+    t = ClickListThread(update_cart)
+    t.daemon = True
+    t.start()
+    return index(environ, start_response)
+
+def empty(environ, start_response):
+    t = ClickListThread(empty_cart)
+    t.daemon = True
+    t.start()
+    return index(environ, start_response)
+
 def events(environ, start_response):
+    global running
     if not running:
         start_response('204 No Content', [('Content-Type', 'text/event-stream')]) #('Cache-Control: no-cache')
         return [b'']
@@ -67,6 +78,8 @@ def events(environ, start_response):
             yield 'data:{} {}: {}\n\n'.format(line.levelname, t.strftime("%Y-%m-%d %H:%M:%S.%f"), line.message).encode('utf-8')
     except:
         pass
+    if running == "Stopped":
+        running = None
 
 def not_found(environ, start_response):
     """Called if no URL matches."""
@@ -75,7 +88,8 @@ def not_found(environ, start_response):
 
 # map urls to functions
 urls = [
-    (r'^$', index),
+    (r'update/?$', update),
+    (r'empty/?$', empty),
     (r'events/?$', events),
 ]
 

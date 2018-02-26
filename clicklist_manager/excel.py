@@ -1,7 +1,10 @@
+import logging
+import re
+
 from openpyxl import Workbook
 from openpyxl import load_workbook
+from openpyxl.formula import Tokenizer
 from dateutil.parser import parse
-
 
 def write_purchases(purchases, xls):
     wb = Workbook()
@@ -50,8 +53,20 @@ def build_order(xls):
         count = ws.cell(row, 1).value
         if not count:
             continue
-        link = ws.cell(row, 2).hyperlink.target
-        items[link] = count
+        try:
+            link = ws.cell(row, 2).hyperlink.target
+            name = ws.cell(row, 2).value
+        except:
+            value = ws.cell(row, 2).value
+            tok = Tokenizer(value)
+            if tok and len(tok.items) >= 4 and tok.items[0].value == "HYPERLINK(":
+                link = tok.items[1].value.strip('"\'')
+                name = tok.items[3].value.strip('"\'')
+            else:
+                logging.error("Could not parse link from: {}".format(value))
+                logging.error("\n".join("%12s%11s%9s" % (t.value, t.type, t.subtype) for t in tok.items))
+                continue
+        items[link] = {'name': name, 'count': count, 'link': link}
     return items
 
 #items = create_order('export.xlsx')
