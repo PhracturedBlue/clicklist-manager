@@ -1,0 +1,6 @@
+BASEURL = 'https://www.fredmeyer.com/'
+username = "clicklistlogin@email.address"
+password = "<your clicklist password>"
+# Replace ths following link with your spreadsheet
+xls_link = "https://docs.google.com/spreadsheets/d/1cP5kxqIlaFky0qJvS8CaF1-ofATcfNt7q4BDmtARxhc/export"
+secret_json = "client_secret.json"
